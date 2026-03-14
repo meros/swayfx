@@ -436,5 +436,20 @@ sway_image_capture_source_create_with_scene_node(
 	source->output_frame.notify = source_handle_output_frame;
 	wl_signal_add(&source->output.events.frame, &source->output_frame);
 
+	/* Set initial buffer constraints from current scene node extents.
+	 * Without this, sessions created before source_start() would receive
+	 * 0x0 buffer_size because the output has no mode set yet. */
+	struct wlr_box extents;
+	get_scene_node_extents(source->node, &extents);
+	if (extents.width > 0 && extents.height > 0) {
+		struct wlr_output_state state;
+		wlr_output_state_init(&state);
+		wlr_output_state_set_enabled(&state, true);
+		wlr_output_state_set_custom_mode(&state,
+			extents.width, extents.height, 0);
+		source_update_buffer_constraints(source, &state);
+		wlr_output_state_finish(&state);
+	}
+
 	return &source->base;
 }
