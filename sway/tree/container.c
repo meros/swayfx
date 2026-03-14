@@ -15,6 +15,7 @@
 #include "sway/ipc-server.h"
 #include "sway/scene_descriptor.h"
 #include "sway/sway_text_node.h"
+#include "sway/ext_foreign_toplevel_capture.h"
 #include "sway/output.h"
 #include "sway/server.h"
 #include "sway/tree/arrange.h"
@@ -35,6 +36,12 @@ static void handle_output_enter(
 	if (con->view->foreign_toplevel) {
 		wlr_foreign_toplevel_handle_v1_output_enter(
 			con->view->foreign_toplevel, output->output);
+	}
+
+	// Update capture source scale to match the new output for HiDPI
+	if (con->view->image_capture_source) {
+		sway_image_capture_source_set_scale(
+			con->view->image_capture_source, output->output->scale);
 	}
 }
 

@@ -34,6 +34,8 @@ struct scene_node_source {
 	struct wlr_output output;
 	struct wlr_scene_output *scene_output;
 
+	float scale; // output scale for HiDPI capture
+
 	size_t num_started;
 
 	struct wl_listener node_destroy;
@@ -152,6 +154,9 @@ static void source_render(struct scene_node_source *source) {
 	wlr_output_state_init(&state);
 	wlr_output_state_set_enabled(&state, true);
 	wlr_output_state_set_custom_mode(&state, extents.width, extents.height, 0);
+	if (source->scale > 1.0f) {
+		wlr_output_state_set_scale(&state, source->scale);
+	}
 	bool ok = wlr_scene_output_build_state(scene_output, &state, NULL) &&
 		wlr_output_commit_state(scene_output->output, &state);
 	wlr_output_state_finish(&state);
@@ -270,7 +275,8 @@ static bool output_test(struct wlr_output *output,
 		WLR_OUTPUT_STATE_BACKEND_OPTIONAL |
 		WLR_OUTPUT_STATE_BUFFER |
 		WLR_OUTPUT_STATE_ENABLED |
-		WLR_OUTPUT_STATE_MODE;
+		WLR_OUTPUT_STATE_MODE |
+		WLR_OUTPUT_STATE_SCALE;
 	if ((state->committed & ~supported) != 0) {
 		return false;
 	}
@@ -278,8 +284,14 @@ static bool output_test(struct wlr_output *output,
 	if (state->committed & WLR_OUTPUT_STATE_BUFFER) {
 		int pending_width, pending_height;
 		pending_resolution(output, state, &pending_width, &pending_height);
-		if (state->buffer->width != pending_width ||
-				state->buffer->height != pending_height) {
+
+		float scale = (state->committed & WLR_OUTPUT_STATE_SCALE)
+			? state->scale : output->scale;
+		int expected_width = (int)(pending_width * scale);
+		int expected_height = (int)(pending_height * scale);
+
+		if (state->buffer->width != expected_width ||
+				state->buffer->height != expected_height) {
 			return false;
 		}
 	}
@@ -399,6 +411,7 @@ sway_image_capture_source_create_with_scene_node(
 	}
 
 	source->node = node;
+	source->scale = 1.0f;
 
 	wlr_ext_image_capture_source_v1_init(&source->base, &source_impl);
 
@@ -447,9 +460,30 @@ sway_image_capture_source_create_with_scene_node(
 		wlr_output_state_set_enabled(&state, true);
 		wlr_output_state_set_custom_mode(&state,
 			extents.width, extents.height, 0);
+		if (source->scale > 1.0f) {
+			wlr_output_state_set_scale(&state, source->scale);
+		}
 		source_update_buffer_constraints(source, &state);
 		wlr_output_state_finish(&state);
 	}
 
 	return &source->base;
+}
+
+void sway_image_capture_source_set_scale(
+		struct wlr_ext_image_capture_source_v1 *base, float scale) {
+	struct scene_node_source *source = wl_container_of(base, source, base);
+	if (scale < 1.0f) {
+		scale = 1.0f;
+	}
+	if (source->scale == scale) {
+		return;
+	}
+	source->scale = scale;
+
+	/* Re-render with new scale if capture is active, which will also
+	 * update buffer constraints (via mode change -> output_commit). */
+	if (source->num_started > 0) {
+		source_render(source);
+	}
 }

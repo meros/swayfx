@@ -48,4 +48,13 @@ sway_image_capture_source_create_with_scene_node(
 	struct wlr_scene_node *node, struct wl_event_loop *event_loop,
 	struct wlr_allocator *allocator, struct wlr_renderer *renderer);
 
+/**
+ * Update the scale used by the capture source's virtual output.
+ * This affects the buffer_size reported to capture clients and the
+ * resolution of captured frames. Should be called when the view moves
+ * to an output with a different scale.
+ */
+void sway_image_capture_source_set_scale(
+	struct wlr_ext_image_capture_source_v1 *source, float scale);
+
 #endif

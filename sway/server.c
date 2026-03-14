@@ -60,7 +60,9 @@
 #include "sway/server.h"
 #include "sway/input/cursor.h"
 #include "sway/ext_foreign_toplevel_capture.h"
+#include "sway/tree/container.h"
 #include "sway/tree/view.h"
+#include "sway/tree/workspace.h"
 #include "sway/tree/root.h"
 
 #if WLR_HAS_XWAYLAND
@@ -253,6 +255,14 @@ static void handle_new_foreign_toplevel_capture_request(
 		if (view->image_capture_source == NULL) {
 			return;
 		}
+	}
+
+	// Set capture scale to match the view's current output for HiDPI
+	if (view->container && view->container->pending.workspace &&
+			view->container->pending.workspace->output) {
+		struct sway_output *output = view->container->pending.workspace->output;
+		sway_image_capture_source_set_scale(
+			view->image_capture_source, output->wlr_output->scale);
 	}
 
 	sway_foreign_toplevel_image_capture_request_accept(
