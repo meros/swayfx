@@ -21,6 +21,18 @@ For Fedora users, SwayFX is also available in [copr](https://copr.fedorainfraclo
 
 [Join our Discord](https://discord.gg/qsSx397rkh)
 
+## 🤖 AI-First Documentation
+
+SwayFX includes comprehensive AI-optimized documentation to help you leverage AI coding assistants for rapid development:
+
+- **[AI_DOCS_INDEX.md](AI_DOCS_INDEX.md)** - Start here for AI development
+- **[AGENTS.md](AGENTS.md)** - Comprehensive AI development guide
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Deep technical details
+- **[PATTERNS.md](PATTERNS.md)** - Code examples and patterns
+- **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Quick lookup guide
+
+These docs follow industry best practices (AGENTS.md standard) for AI-assisted development.
+
 ## New Configuration Options
 
 + Window blur:

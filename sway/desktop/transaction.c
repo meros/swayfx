@@ -15,6 +15,7 @@
 #include "sway/server.h"
 #include "sway/tree/container.h"
 #include "sway/tree/node.h"
+#include "sway/tree/sash.h"
 #include "sway/tree/view.h"
 #include "sway/tree/workspace.h"
 #include "list.h"
@@ -400,15 +401,21 @@ static void arrange_children(enum sway_container_layout layout, list_t *children
 	} else {
 		sway_assert(false, "unreachable");
 	}
+
+	// Update sashes for parent container
+	// This is called from arrange_container, so we need to find parent
+	// that owns this content tree
 }
 
 static void arrange_container(struct sway_container *con,
 		int width, int height, bool title_bar, int gaps) {
+	sway_log(SWAY_DEBUG, "arrange_container called: view=%d", con->view != NULL);
 	// this container might have previously been in the scratchpad,
 	// make sure it's enabled for viewing
 	wlr_scene_node_set_enabled(&con->scene_tree->node, true);
 
 	if (con->view) {
+		sway_log(SWAY_DEBUG, "arrange_container: view path");
 		// reuse the position from arrange_child. A bit hacky, but this reduces diff size vs upstream.
 		int x = get_animated_value(con->scene_tree->node.x + con->animation_state.delta_x,
 			con->scene_tree->node.x, *con->animation_state.animation);
@@ -601,6 +608,7 @@ static void arrange_container(struct sway_container *con,
 		wlr_scene_node_set_position(&con->blur->node, border_left, border_top);
 		wlr_scene_blur_set_size(con->blur, content_width, content_height);
 	} else {
+		sway_log(SWAY_DEBUG, "arrange_container: non-view path, layout=%d", con->current.layout);
 		// make sure to disable the title bar if the parent is not managing it
 		if (title_bar) {
 			wlr_scene_node_set_enabled(&con->title_bar.tree->node, false);
@@ -613,6 +621,11 @@ static void arrange_container(struct sway_container *con,
 		arrange_children(con->current.layout, con->current.children,
 			con->current.focused_inactive_child, con->content_tree,
 			width, height, gaps);
+
+		sway_log(SWAY_DEBUG, "arrange_container: calling update_sashes");
+		// Update sashes after arranging children
+		update_sashes(con);
+		sway_log(SWAY_DEBUG, "arrange_container: update_sashes returned");
 	}
 }
 

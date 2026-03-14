@@ -13,6 +13,7 @@
 #include "sway/input/text_input.h"
 
 struct sway_seat;
+struct sway_sash;
 
 struct sway_seatop_impl {
 	void (*button)(struct sway_seat *seat, uint32_t time_msec,
@@ -282,6 +283,8 @@ void seatop_begin_resize_floating(struct sway_seat *seat,
 
 void seatop_begin_resize_tiling(struct sway_seat *seat,
 		struct sway_container *con, enum wlr_edges edge);
+
+void seatop_begin_resize_sash(struct sway_seat *seat, struct sway_sash *sash);
 
 struct sway_container *seat_get_focus_inactive_floating(struct sway_seat *seat,
 		struct sway_workspace *workspace);

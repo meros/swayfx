@@ -13,6 +13,7 @@
 #include "sway/output.h"
 #include "sway/server.h"
 #include "sway/scene_descriptor.h"
+#include "sway/tree/sash.h"
 #include "sway/tree/view.h"
 #include "sway/tree/workspace.h"
 #include "log.h"
@@ -392,6 +393,22 @@ static void handle_button(struct sway_seat *seat, uint32_t time_msec,
 		return;
 	}
 
+	// Handle tiling resize via sash
+	if (config->sash_enabled && button == BTN_LEFT &&
+			state == WL_POINTER_BUTTON_STATE_PRESSED) {
+		// Check if cursor is over a sash
+		struct wlr_scene_node *scene_node = wlr_scene_node_at(
+			&root->staging->node, cursor->cursor->x, cursor->cursor->y, NULL, NULL);
+		if (scene_node) {
+			struct sway_sash *sash = sash_try_get(scene_node);
+			if (sash) {
+				sway_log(SWAY_DEBUG, "Clicked on sash, starting resize");
+				seatop_begin_resize_sash(seat, sash);
+				return;
+			}
+		}
+	}
+
 	// Handle tiling resize via border
 	if (cont && resize_edge && button == BTN_LEFT &&
 			state == WL_POINTER_BUTTON_STATE_PRESSED && !is_floating) {
@@ -617,7 +634,26 @@ static void handle_pointer_motion(struct sway_seat *seat, uint32_t time_msec) {
 			wlr_seat_pointer_notify_motion(seat->wlr_seat, time_msec, sx, sy);
 		}
 	} else {
-		cursor_update_image(cursor, node);
+		// Check if cursor is over a sash
+		bool over_sash = false;
+		if (config->sash_enabled) {
+			struct wlr_scene_node *scene_node = wlr_scene_node_at(
+				&root->staging->node, cursor->cursor->x, cursor->cursor->y, NULL, NULL);
+			if (scene_node) {
+				struct sway_sash *sash = sash_try_get(scene_node);
+				if (sash) {
+					// Set cursor based on sash orientation
+					const char *cursor_name = sash->orientation == L_HORIZ ?
+						"col-resize" : "row-resize";
+					cursor_set_image(cursor, cursor_name, NULL);
+					over_sash = true;
+				}
+			}
+		}
+
+		if (!over_sash) {
+			cursor_update_image(cursor, node);
+		}
 		wlr_seat_pointer_notify_clear_focus(seat->wlr_seat);
 	}
 
