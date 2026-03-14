@@ -92,6 +92,9 @@ struct sway_view {
 
 	struct wlr_ext_foreign_toplevel_handle_v1 *ext_foreign_toplevel;
 
+	struct wlr_scene *image_capture_scene;
+	struct wlr_ext_image_capture_source_v1 *image_capture_source;
+
 	struct wlr_foreign_toplevel_handle_v1 *foreign_toplevel;
 	struct wl_listener foreign_activate_request;
 	struct wl_listener foreign_fullscreen_request;
@@ -125,6 +128,8 @@ struct sway_view {
 struct sway_xdg_shell_view {
 	struct sway_view view;
 
+	struct wlr_scene_tree *image_capture_tree;
+
 	struct wl_listener commit;
 	struct wl_listener request_move;
 	struct wl_listener request_resize;
@@ -143,6 +148,7 @@ struct sway_xwayland_view {
 	struct sway_view view;
 
 	struct wlr_scene_tree *surface_tree;
+	struct wlr_scene_surface *image_capture_scene_surface;
 
 	struct wl_listener commit;
 	struct wl_listener request_move;
@@ -194,10 +200,12 @@ struct sway_popup_desc {
 
 struct sway_xdg_popup {
 	struct sway_view *view;
+	struct wlr_xdg_popup *wlr_xdg_popup;
 
 	struct wlr_scene_tree *scene_tree;
 	struct wlr_scene_tree *xdg_surface_tree;
-	struct wlr_xdg_popup *wlr_xdg_popup;
+
+	struct wlr_scene_tree *image_capture_tree;
 
 	struct sway_popup_desc desc;
 

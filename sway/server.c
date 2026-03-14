@@ -59,6 +59,8 @@
 #include "sway/output.h"
 #include "sway/server.h"
 #include "sway/input/cursor.h"
+#include "sway/ext_foreign_toplevel_capture.h"
+#include "sway/tree/view.h"
 #include "sway/tree/root.h"
 
 #if WLR_HAS_XWAYLAND
@@ -114,6 +116,7 @@ static bool is_privileged(const struct wl_global *global) {
 		global == server.screencopy_manager_v1->global ||
 		global == server.ext_image_copy_capture_manager_v1->global ||
 		global == server.export_dmabuf_manager_v1->global ||
+		global == server.foreign_toplevel_capture_manager->global ||
 		global == server.security_context_manager_v1->global ||
 		global == server.gamma_control_manager_v1->global ||
 		global == server.layer_shell->global ||
@@ -231,6 +234,29 @@ static void handle_renderer_lost(struct wl_listener *listener, void *data) {
 
 	sway_log(SWAY_INFO, "Scheduling re-creation of renderer after GPU reset");
 	server->recreating_renderer = wl_event_loop_add_idle(server->wl_event_loop, do_renderer_recreate, server);
+}
+
+static void handle_new_foreign_toplevel_capture_request(
+		struct wl_listener *listener, void *data) {
+	struct sway_foreign_toplevel_image_capture_request *request = data;
+	struct sway_view *view = request->toplevel_handle->data;
+	if (view == NULL) {
+		return;
+	}
+
+	if (view->image_capture_source == NULL) {
+		view->image_capture_source =
+			sway_image_capture_source_create_with_scene_node(
+				&view->image_capture_scene->tree.node,
+				server.wl_event_loop, server.allocator,
+				server.renderer);
+		if (view->image_capture_source == NULL) {
+			return;
+		}
+	}
+
+	sway_foreign_toplevel_image_capture_request_accept(
+		request, view->image_capture_source);
 }
 
 bool server_init(struct sway_server *server) {
@@ -368,6 +394,15 @@ bool server_init(struct sway_server *server) {
 	server->foreign_toplevel_manager =
 		wlr_foreign_toplevel_manager_v1_create(server->wl_display);
 
+	server->foreign_toplevel_capture_manager =
+		sway_foreign_toplevel_image_capture_manager_create(
+			server->wl_display, 1);
+	server->new_foreign_toplevel_capture_request.notify =
+		handle_new_foreign_toplevel_capture_request;
+	wl_signal_add(
+		&server->foreign_toplevel_capture_manager->events.new_request,
+		&server->new_foreign_toplevel_capture_request);
+
 	sway_session_lock_init();
 
 #if WLR_HAS_DRM_BACKEND
@@ -487,6 +522,7 @@ void server_fini(struct sway_server *server) {
 		wl_list_remove(&server->drm_lease_request.link);
 	}
 #endif
+	wl_list_remove(&server->new_foreign_toplevel_capture_request.link);
 	wl_list_remove(&server->tearing_control_new_object.link);
 	wl_list_remove(&server->xdg_activation_v1_request_activate.link);
 	wl_list_remove(&server->xdg_activation_v1_new_token.link);

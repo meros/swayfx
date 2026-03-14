@@ -502,6 +502,12 @@ static void handle_unmap(struct wl_listener *listener, void *data) {
 		xwayland_view->surface_tree = NULL;
 	}
 
+	if (xwayland_view->image_capture_scene_surface) {
+		wlr_scene_node_destroy(
+			&xwayland_view->image_capture_scene_surface->buffer->node);
+		xwayland_view->image_capture_scene_surface = NULL;
+	}
+
 	view_unmap(view);
 }
 
@@ -530,6 +536,11 @@ static void handle_map(struct wl_listener *listener, void *data) {
 
 	xwayland_view->surface_tree = wlr_scene_subsurface_tree_create(
 		xwayland_view->view.content_tree, xsurface->surface);
+
+	xwayland_view->image_capture_scene_surface =
+		wlr_scene_surface_create(
+			&xwayland_view->view.image_capture_scene->tree,
+			xsurface->surface);
 
 	if (xwayland_view->surface_tree) {
 		xwayland_view->surface_tree_destroy.notify = handle_surface_tree_destroy;

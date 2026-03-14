@@ -3,6 +3,7 @@
 #include <wayland-server-core.h>
 #include <wlr/config.h>
 #include <wlr/render/wlr_renderer.h>
+#include <scenefx/types/wlr_scene.h>
 #include <wlr/types/wlr_buffer.h>
 #include <wlr/types/wlr_ext_foreign_toplevel_list_v1.h>
 #include <wlr/types/wlr_foreign_toplevel_management_v1.h>
@@ -54,6 +55,12 @@ bool view_init(struct sway_view *view, enum sway_view_type type,
 		return false;
 	}
 
+	view->image_capture_scene = wlr_scene_create();
+	if (view->image_capture_scene == NULL) {
+		wlr_scene_node_destroy(&view->scene_tree->node);
+		return false;
+	}
+
 	view->type = type;
 	view->impl = impl;
 	view->executed_criteria = create_list();
@@ -81,6 +88,7 @@ void view_destroy(struct sway_view *view) {
 	list_free(view->executed_criteria);
 
 	view_assign_ctx(view, NULL);
+	wlr_scene_node_destroy(&view->image_capture_scene->tree.node);
 	wlr_scene_node_destroy(&view->scene_tree->node);
 	if (view->impl->destroy) {
 		view->impl->destroy(view);
@@ -841,6 +849,7 @@ void view_map(struct sway_view *view, struct wlr_surface *wlr_surface,
 	};
 	view->ext_foreign_toplevel =
 		wlr_ext_foreign_toplevel_handle_v1_create(server.foreign_toplevel_list, &foreign_toplevel_state);
+	view->ext_foreign_toplevel->data = view;
 
 	view->foreign_toplevel =
 		wlr_foreign_toplevel_handle_v1_create(server.foreign_toplevel_manager);

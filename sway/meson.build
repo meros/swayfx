@@ -4,6 +4,8 @@ sway_sources = files(
 	'config.c',
 	'criteria.c',
 	'decoration.c',
+	'ext_foreign_toplevel_capture.c',
+	'ext_image_capture_source_scene.c',
 	'ipc-json.c',
 	'ipc-server.c',
 	'layer_criteria.c',
