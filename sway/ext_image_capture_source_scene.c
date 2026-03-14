@@ -21,7 +21,7 @@
 #include <wlr/render/wlr_renderer.h>
 #include <wlr/types/wlr_ext_image_copy_capture_v1.h>
 #include <wlr/types/wlr_output.h>
-#include <wlr/types/wlr_scene.h>
+#include <scenefx/types/wlr_scene.h>
 #include <wlr/util/log.h>
 #include "sway/ext_foreign_toplevel_capture.h"
 
