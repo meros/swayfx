@@ -18,6 +18,7 @@
 #include "sway/output.h"
 #include "sway/server.h"
 #include "sway/tree/arrange.h"
+#include "sway/tree/sash.h"
 #include "sway/tree/view.h"
 #include "sway/tree/workspace.h"
 #include "sway/xdg_decoration.h"
@@ -165,6 +166,8 @@ struct sway_container *container_create(struct sway_view *view) {
 	if (!view) {
 		c->pending.children = create_list();
 		c->current.children = create_list();
+		// Initialize sash manager for containers with children
+		sash_manager_init(c);
 	}
 
 	c->pending.layout = L_NONE;
@@ -569,6 +572,9 @@ void container_destroy(struct sway_container *con) {
 	free(con->title_format);
 	list_free(con->pending.children);
 	list_free(con->current.children);
+
+	// Cleanup sash manager
+	sash_manager_destroy(con);
 
 	list_free_items_and_destroy(con->marks);
 

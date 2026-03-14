@@ -1,0 +1,83 @@
+# SwayFX - LLM-Ready Documentation Index
+
+> SwayFX: A feature-rich Wayland compositor with GPU-accelerated visual effects
+> Fork of Sway (i3-compatible tiling window manager) with blur, shadows, rounded corners
+
+## Primary Documentation
+
+- AGENTS.md: Comprehensive AI development guide with architecture, conventions, patterns
+- ARCHITECTURE.md: Deep technical details on data structures, subsystems, rendering pipeline
+- README.md: User-facing documentation, features, installation, configuration examples
+- CONTRIBUTING.md: Development guidelines, code style, pull request process
+
+## Core Codebase
+
+- sway/server.c: Main Wayland server initialization and event loop (800 lines)
+- sway/tree/container.c: Window container management and lifecycle (2034 lines)
+- sway/desktop/output.c: Output rendering coordination with scenefx effects (799 lines)
+- sway/config.c: Configuration file parsing and management (1049 lines)
+- sway/commands.c: Command dispatcher and handler registry (450 lines)
+
+## Key Concepts
+
+- **Wayland Compositor**: Display server that manages windows, input, and rendering
+- **wlroots (0.19.x)**: Compositor library providing backend abstraction
+- **scenefx**: Custom GLES2 renderer for GPU-accelerated blur, shadows, rounded corners
+- **Scene Graph**: Tree-based rendering model (outputs → workspaces → containers → views)
+- **Transaction System**: Atomic state updates for glitch-free layout changes
+- **IPC Protocol**: JSON over UNIX socket for external control (swaymsg)
+
+## SwayFX Features
+
+- Blur effects (configurable passes, radius, noise, color adjustments)
+- Drop shadows (customizable color, offset, blur radius)
+- Anti-aliased rounded corners
+- Dim inactive windows
+- Layer-specific effects (panels, notifications)
+- Smooth animations (resize, movement)
+
+## Build Information
+
+- Language: C11 (POSIX-compliant)
+- Build System: Meson (>=1.3)
+- Dependencies: wlroots, scenefx, wayland-server, libinput, cairo, pango, json-c, pcre2
+- Version: 0.5.3 (based on Sway 1.11.0)
+
+## Quick Reference
+
+**Command structure**: `~/.config/sway/config` with commands like:
+```
+blur enable
+blur_passes 2
+blur_radius 5
+corner_radius 10
+shadows enable
+```
+
+**IPC usage**: `swaymsg <command>` or `swaymsg -t get_tree`
+
+**Critical structures**:
+- struct sway_server: Root server context
+- struct sway_container: Window/container representation
+- struct sway_output: Physical display/monitor
+- struct sway_layer_surface: System UI element (panel, notification)
+
+**Effect implementation**: Properties on containers → transaction system → scenefx rendering
+
+## Development Workflow
+
+1. Modify source code
+2. Build: `ninja -C build/`
+3. Test: `./build/sway/sway` or `swaymsg reload`
+4. Debug: `sway -d` for verbose logging
+
+## Links
+
+- Repository: https://github.com/WillPower3309/swayfx
+- Upstream Sway: https://github.com/swaywm/sway
+- wlroots: https://gitlab.freedesktop.org/wlroots/wlroots
+- Wayland: https://wayland.freedesktop.org/
+
+---
+
+*This file follows the llms.txt standard for AI-readable documentation. For detailed information, see AGENTS.md and ARCHITECTURE.md.*

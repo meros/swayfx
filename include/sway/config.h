@@ -507,6 +507,13 @@ struct sway_config {
 	bool titlebar_separator;
 	bool scratchpad_minimize;
 
+	// Sash configuration
+	bool sash_enabled;
+	float sash_color[4];
+	float sash_hover_color[4];
+	int sash_thickness;
+	float sash_opacity;
+
 	list_t *layer_criteria;
 
 	char *swaynag_command;

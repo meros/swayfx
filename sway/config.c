@@ -375,6 +375,19 @@ static void config_defaults(struct sway_config *config) {
 	config->titlebar_separator = true;
 	config->scratchpad_minimize = false;
 
+	// Sash defaults
+	config->sash_enabled = true;
+	config->sash_color[0] = 0.5f;  // Gray
+	config->sash_color[1] = 0.5f;
+	config->sash_color[2] = 0.5f;
+	config->sash_color[3] = 1.0f;
+	config->sash_hover_color[0] = 0.7f;  // Lighter gray on hover
+	config->sash_hover_color[1] = 0.7f;
+	config->sash_hover_color[2] = 0.7f;
+	config->sash_hover_color[3] = 1.0f;
+	config->sash_thickness = 3;
+	config->sash_opacity = 0.3f;
+
 	if (!(config->layer_criteria = create_list())) {
 		goto cleanup;
 	}

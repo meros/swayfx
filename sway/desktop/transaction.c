@@ -15,6 +15,7 @@
 #include "sway/server.h"
 #include "sway/tree/container.h"
 #include "sway/tree/node.h"
+#include "sway/tree/sash.h"
 #include "sway/tree/view.h"
 #include "sway/tree/workspace.h"
 #include "list.h"
@@ -400,6 +401,10 @@ static void arrange_children(enum sway_container_layout layout, list_t *children
 	} else {
 		sway_assert(false, "unreachable");
 	}
+
+	// Update sashes for parent container
+	// This is called from arrange_container, so we need to find parent
+	// that owns this content tree
 }
 
 static void arrange_container(struct sway_container *con,
@@ -613,6 +618,9 @@ static void arrange_container(struct sway_container *con,
 		arrange_children(con->current.layout, con->current.children,
 			con->current.focused_inactive_child, con->content_tree,
 			width, height, gaps);
+
+		// Update sashes after arranging children
+		update_sashes(con);
 	}
 }
 
