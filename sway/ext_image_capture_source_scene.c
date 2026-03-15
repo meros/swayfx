@@ -180,6 +180,12 @@ static void source_start(struct wlr_ext_image_capture_source_v1 *base,
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now);
 	wlr_scene_output_send_frame_done(source->scene_output, &now);
+
+	/* Schedule another frame so that the session's source_frame listener
+	 * (registered AFTER start() returns) receives the initial damage.
+	 * Without this, accumulated_damage stays empty and frame_handle_capture
+	 * becomes a no-op, causing the client to time out. */
+	wlr_output_update_needs_frame(&source->output);
 }
 
 static void source_stop(struct wlr_ext_image_capture_source_v1 *base) {
