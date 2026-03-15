@@ -166,6 +166,17 @@ static void source_render(struct scene_node_source *source) {
 	}
 }
 
+static void idle_initial_render(void *data) {
+	struct scene_node_source *source = data;
+	if (source->scene_output == NULL || source->num_started == 0) {
+		return;
+	}
+	source_render(source);
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	wlr_scene_output_send_frame_done(source->scene_output, &now);
+}
+
 static void source_start(struct wlr_ext_image_capture_source_v1 *base,
 		bool with_cursors) {
 	struct scene_node_source *source = wl_container_of(base, source, base);
@@ -181,11 +192,17 @@ static void source_start(struct wlr_ext_image_capture_source_v1 *base,
 	clock_gettime(CLOCK_MONOTONIC, &now);
 	wlr_scene_output_send_frame_done(source->scene_output, &now);
 
-	/* Schedule another frame so that the session's source_frame listener
-	 * (registered AFTER start() returns) receives the initial damage.
-	 * Without this, accumulated_damage stays empty and frame_handle_capture
-	 * becomes a no-op, causing the client to time out. */
-	wlr_output_update_needs_frame(&source->output);
+	/* Schedule a render on the next event loop iteration. By that point
+	 * wlroots has registered the session's source_frame listener (it does
+	 * so AFTER start() returns). The idle render will emit the frame
+	 * signal via output_commit, populating accumulated_damage so that a
+	 * subsequent capture() finds damage and completes.
+	 *
+	 * wlr_output_update_needs_frame() does NOT work here because virtual
+	 * outputs have no refresh timer — the needs_frame flag is never
+	 * consumed, so the frame event never fires. */
+	wl_event_loop_add_idle(source->output.event_loop,
+		idle_initial_render, source);
 }
 
 static void source_stop(struct wlr_ext_image_capture_source_v1 *base) {
@@ -206,14 +223,30 @@ static void source_stop(struct wlr_ext_image_capture_source_v1 *base) {
 /*
  * wlroots 0.19 vtable uses schedule_frame(source) instead of
  * request_frame(source, bool schedule_frame) in 0.20+.
+ *
+ * For virtual outputs without a refresh timer, we must use an idle
+ * callback to trigger the render since wlr_output_update_needs_frame()
+ * sets a flag that no backend ever checks.
  */
+static void idle_schedule_render(void *data) {
+	struct scene_node_source *source = data;
+	if (source->scene_output == NULL || source->num_started == 0) {
+		return;
+	}
+	source_render(source);
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	wlr_scene_output_send_frame_done(source->scene_output, &now);
+}
+
 static void source_schedule_frame(
 		struct wlr_ext_image_capture_source_v1 *base) {
 	struct scene_node_source *source = wl_container_of(base, source, base);
 	if (source->output.frame_pending) {
 		wlr_output_send_frame(&source->output);
 	}
-	wlr_output_update_needs_frame(&source->output);
+	wl_event_loop_add_idle(source->output.event_loop,
+		idle_schedule_render, source);
 }
 
 static void source_copy_frame(struct wlr_ext_image_capture_source_v1 *base,
