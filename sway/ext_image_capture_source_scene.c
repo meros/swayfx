@@ -186,17 +186,11 @@ static void source_start(struct wlr_ext_image_capture_source_v1 *base,
 		return;
 	}
 
-	source_render(source);
-
-	struct timespec now;
-	clock_gettime(CLOCK_MONOTONIC, &now);
-	wlr_scene_output_send_frame_done(source->scene_output, &now);
-
-	/* Schedule a render on the next event loop iteration. By that point
-	 * wlroots has registered the session's source_frame listener (it does
-	 * so AFTER start() returns). The idle render will emit the frame
-	 * signal via output_commit, populating accumulated_damage so that a
-	 * subsequent capture() finds damage and completes.
+	/* Do NOT render here. wlroots registers the session's source_frame
+	 * listener AFTER start() returns, so any frame signal emitted now
+	 * would be lost. Instead, schedule the first render as an idle
+	 * callback — by that point the listener is registered, and the scene
+	 * output still has its initial full damage (never been rendered to).
 	 *
 	 * wlr_output_update_needs_frame() does NOT work here because virtual
 	 * outputs have no refresh timer — the needs_frame flag is never
