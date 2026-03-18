@@ -70,6 +70,9 @@ struct sway_root {
 
 	struct sway_container *fullscreen_global;
 
+	// Visual highlight for gap between tiling containers on hover
+	struct wlr_scene_rect *gap_highlight;
+
 	struct {
 		struct wl_signal new_node;
 	} events;

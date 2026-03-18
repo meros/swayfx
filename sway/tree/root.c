@@ -62,6 +62,28 @@ struct sway_root *root_create(struct wl_display *wl_display) {
 		failed = true;
 	}
 
+	if (!failed) {
+		// Gap highlight overlay - positioned above tiling, below floating
+		// Semi-transparent white rectangle, hidden by default
+		root->gap_highlight = wlr_scene_rect_create(
+			root->layer_tree, 0, 0, (float[4]){1.f, 1.f, 1.f, 0.15f});
+		if (!root->gap_highlight) {
+			failed = true;
+		} else {
+			wlr_scene_node_set_enabled(&root->gap_highlight->node, false);
+			// Don't intercept input — let hits pass through to workspace
+			root->gap_highlight->accepts_input = false;
+			// Place it above the tiling layer
+			wlr_scene_node_place_above(&root->gap_highlight->node,
+				&root->layers.tiling->node);
+
+			if (!scene_descriptor_assign(&root->gap_highlight->node,
+					SWAY_SCENE_DESC_NON_INTERACTIVE, (void *)1)) {
+				failed = true;
+			}
+		}
+	}
+
 	if (failed) {
 		wlr_scene_node_destroy(&root_scene->tree.node);
 		free(root);

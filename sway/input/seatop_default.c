@@ -13,6 +13,8 @@
 #include "sway/output.h"
 #include "sway/server.h"
 #include "sway/scene_descriptor.h"
+#include "sway/tree/container.h"
+#include "sway/tree/root.h"
 #include "sway/tree/view.h"
 #include "sway/tree/workspace.h"
 #include "log.h"
@@ -114,6 +116,168 @@ enum wlr_edges find_resize_edge(struct sway_container *cont,
 		return WLR_EDGE_NONE;
 	}
 	return edge;
+}
+
+/**
+ * Walk the tiling container tree and find if the point (lx, ly) is in a gap
+ * between two adjacent siblings. If found, return the container on the
+ * right/bottom side and set *edge to the edge facing the gap (LEFT or TOP).
+ * This container+edge can be passed directly to seatop_begin_resize_tiling.
+ */
+static struct sway_container *find_gap_container(
+		list_t *children, enum sway_container_layout layout,
+		double lx, double ly, enum wlr_edges *edge) {
+	if (!children || children->length < 2) {
+		// Can't have gaps with fewer than 2 children, but a single child
+		// may have sub-children with gaps — check below.
+		if (children && children->length == 1) {
+			struct sway_container *child = children->items[0];
+			if (child->pending.children && child->pending.children->length >= 2 &&
+					(child->pending.layout == L_HORIZ || child->pending.layout == L_VERT)) {
+				return find_gap_container(child->pending.children,
+					child->pending.layout, lx, ly, edge);
+			}
+		}
+		return NULL;
+	}
+
+	for (int i = 0; i < children->length - 1; i++) {
+		struct sway_container *a = children->items[i];
+		struct sway_container *b = children->items[i + 1];
+
+		if (layout == L_HORIZ) {
+			double gap_start = a->pending.x + a->pending.width;
+			double gap_end = b->pending.x;
+			if (lx >= gap_start && lx < gap_end &&
+					ly >= a->pending.y && ly < a->pending.y + a->pending.height) {
+				*edge = WLR_EDGE_LEFT;
+				return b;
+			}
+		} else if (layout == L_VERT) {
+			double gap_start = a->pending.y + a->pending.height;
+			double gap_end = b->pending.y;
+			if (ly >= gap_start && ly < gap_end &&
+					lx >= a->pending.x && lx < a->pending.x + a->pending.width) {
+				*edge = WLR_EDGE_TOP;
+				return b;
+			}
+		}
+	}
+
+	// Recurse into children that contain the point
+	for (int i = 0; i < children->length; i++) {
+		struct sway_container *child = children->items[i];
+		if (lx < child->pending.x || lx >= child->pending.x + child->pending.width ||
+				ly < child->pending.y || ly >= child->pending.y + child->pending.height) {
+			continue;
+		}
+		if (child->pending.children && child->pending.children->length >= 2 &&
+				(child->pending.layout == L_HORIZ || child->pending.layout == L_VERT)) {
+			struct sway_container *result = find_gap_container(
+				child->pending.children, child->pending.layout, lx, ly, edge);
+			if (result) {
+				return result;
+			}
+		}
+	}
+
+	return NULL;
+}
+
+/**
+ * Check if the cursor is in a gap between tiling containers in the given
+ * workspace. Returns the container to resize and sets *edge, or NULL.
+ * If gap_box is non-NULL, it is filled with the gap rectangle geometry.
+ */
+static struct sway_container *find_gap_container_at(
+		struct sway_workspace *ws, double lx, double ly,
+		enum wlr_edges *edge) {
+	if (!ws || !ws->tiling || ws->tiling->length == 0) {
+		return NULL;
+	}
+	return find_gap_container(ws->tiling, ws->layout, lx, ly, edge);
+}
+
+/**
+ * Find the gap rectangle at the given position. Returns true if found
+ * and fills in the box with the gap geometry.
+ */
+static bool find_gap_rect(list_t *children, enum sway_container_layout layout,
+		double lx, double ly, struct wlr_box *box) {
+	if (!children) {
+		return false;
+	}
+
+	for (int i = 0; i < children->length - 1; i++) {
+		struct sway_container *a = children->items[i];
+		struct sway_container *b = children->items[i + 1];
+
+		if (layout == L_HORIZ) {
+			double gap_start = a->pending.x + a->pending.width;
+			double gap_end = b->pending.x;
+			if (lx >= gap_start && lx < gap_end &&
+					ly >= a->pending.y && ly < a->pending.y + a->pending.height) {
+				box->x = gap_start;
+				box->y = a->pending.y;
+				box->width = gap_end - gap_start;
+				box->height = a->pending.height;
+				return true;
+			}
+		} else if (layout == L_VERT) {
+			double gap_start = a->pending.y + a->pending.height;
+			double gap_end = b->pending.y;
+			if (ly >= gap_start && ly < gap_end &&
+					lx >= a->pending.x && lx < a->pending.x + a->pending.width) {
+				box->x = a->pending.x;
+				box->y = gap_start;
+				box->width = a->pending.width;
+				box->height = gap_end - gap_start;
+				return true;
+			}
+		}
+	}
+
+	// Recurse into children
+	for (int i = 0; i < children->length; i++) {
+		struct sway_container *child = children->items[i];
+		if (lx < child->pending.x || lx >= child->pending.x + child->pending.width ||
+				ly < child->pending.y || ly >= child->pending.y + child->pending.height) {
+			continue;
+		}
+		if (child->pending.children && child->pending.children->length >= 2 &&
+				(child->pending.layout == L_HORIZ || child->pending.layout == L_VERT)) {
+			if (find_gap_rect(child->pending.children, child->pending.layout,
+					lx, ly, box)) {
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+/**
+ * Show or hide the gap highlight rect based on cursor position.
+ */
+static void update_gap_highlight(struct sway_node *node,
+		double lx, double ly) {
+	if (!root->gap_highlight) {
+		return;
+	}
+
+	if (node && node->type == N_WORKSPACE) {
+		struct wlr_box box;
+		if (find_gap_rect(node->sway_workspace->tiling,
+				node->sway_workspace->layout, lx, ly, &box)) {
+			wlr_scene_node_set_position(&root->gap_highlight->node,
+				box.x, box.y);
+			wlr_scene_rect_set_size(root->gap_highlight, box.width, box.height);
+			wlr_scene_node_set_enabled(&root->gap_highlight->node, true);
+			return;
+		}
+	}
+
+	wlr_scene_node_set_enabled(&root->gap_highlight->node, false);
 }
 
 /**
@@ -368,6 +532,24 @@ static void handle_button(struct sway_seat *seat, uint32_t time_msec,
 		return;
 	}
 
+	// Handle clicking in a gap between tiling containers
+	if (node && node->type == N_WORKSPACE && button == BTN_LEFT &&
+			state == WL_POINTER_BUTTON_STATE_PRESSED) {
+		enum wlr_edges gap_edge = WLR_EDGE_NONE;
+		struct sway_container *gap_con = find_gap_container_at(
+			node->sway_workspace, cursor->cursor->x, cursor->cursor->y,
+			&gap_edge);
+		if (gap_con) {
+			// Hide the gap highlight before starting resize
+			if (root->gap_highlight) {
+				wlr_scene_node_set_enabled(
+					&root->gap_highlight->node, false);
+			}
+			seatop_begin_resize_tiling(seat, gap_con, gap_edge);
+			return;
+		}
+	}
+
 	// Handle clicking an empty workspace
 	if (node && node->type == N_WORKSPACE) {
 		if (state == WL_POINTER_BUTTON_STATE_PRESSED) {
@@ -612,12 +794,31 @@ static void handle_pointer_motion(struct sway_seat *seat, uint32_t time_msec) {
 	}
 
 	if (surface) {
+		update_gap_highlight(node, cursor->cursor->x, cursor->cursor->y);
 		if (seat_is_input_allowed(seat, surface)) {
 			wlr_seat_pointer_notify_enter(seat->wlr_seat, surface, sx, sy);
 			wlr_seat_pointer_notify_motion(seat->wlr_seat, time_msec, sx, sy);
 		}
 	} else {
-		cursor_update_image(cursor, node);
+		update_gap_highlight(node, cursor->cursor->x, cursor->cursor->y);
+		// Check if cursor is in a gap between tiling containers
+		if (node && node->type == N_WORKSPACE) {
+			enum wlr_edges gap_edge = WLR_EDGE_NONE;
+			struct sway_container *gap_con = find_gap_container_at(
+				node->sway_workspace, cursor->cursor->x, cursor->cursor->y,
+				&gap_edge);
+			if (gap_con) {
+				if (gap_edge & (WLR_EDGE_LEFT | WLR_EDGE_RIGHT)) {
+					cursor_set_image(cursor, "col-resize", NULL);
+				} else {
+					cursor_set_image(cursor, "row-resize", NULL);
+				}
+			} else {
+				cursor_update_image(cursor, node);
+			}
+		} else {
+			cursor_update_image(cursor, node);
+		}
 		wlr_seat_pointer_notify_clear_focus(seat->wlr_seat);
 	}
 
@@ -647,7 +848,24 @@ static void handle_tablet_tool_motion(struct sway_seat *seat,
 			wlr_tablet_v2_tablet_tool_notify_motion(tool->tablet_v2_tool, sx, sy);
 		}
 	} else {
-		cursor_update_image(cursor, node);
+		// Check if cursor is in a gap between tiling containers
+		if (node && node->type == N_WORKSPACE) {
+			enum wlr_edges gap_edge = WLR_EDGE_NONE;
+			struct sway_container *gap_con = find_gap_container_at(
+				node->sway_workspace, cursor->cursor->x, cursor->cursor->y,
+				&gap_edge);
+			if (gap_con) {
+				if (gap_edge & (WLR_EDGE_LEFT | WLR_EDGE_RIGHT)) {
+					cursor_set_image(cursor, "col-resize", NULL);
+				} else {
+					cursor_set_image(cursor, "row-resize", NULL);
+				}
+			} else {
+				cursor_update_image(cursor, node);
+			}
+		} else {
+			cursor_update_image(cursor, node);
+		}
 		wlr_tablet_v2_tablet_tool_notify_proximity_out(tool->tablet_v2_tool);
 	}
 
@@ -1115,7 +1333,25 @@ static void handle_rebase(struct sway_seat *seat, uint32_t time_msec) {
 			wlr_seat_pointer_notify_motion(seat->wlr_seat, time_msec, sx, sy);
 		}
 	} else {
-		cursor_update_image(cursor, e->previous_node);
+		// Check if cursor is in a gap between tiling containers
+		struct sway_node *node = e->previous_node;
+		if (node && node->type == N_WORKSPACE) {
+			enum wlr_edges gap_edge = WLR_EDGE_NONE;
+			struct sway_container *gap_con = find_gap_container_at(
+				node->sway_workspace, cursor->cursor->x, cursor->cursor->y,
+				&gap_edge);
+			if (gap_con) {
+				if (gap_edge & (WLR_EDGE_LEFT | WLR_EDGE_RIGHT)) {
+					cursor_set_image(cursor, "col-resize", NULL);
+				} else {
+					cursor_set_image(cursor, "row-resize", NULL);
+				}
+			} else {
+				cursor_update_image(cursor, node);
+			}
+		} else {
+			cursor_update_image(cursor, e->previous_node);
+		}
 		wlr_seat_pointer_notify_clear_focus(seat->wlr_seat);
 	}
 }
