@@ -28,7 +28,7 @@
         packages = rec {
           swayfx-unwrapped-git = pkgs.swayfx-unwrapped.overrideAttrs(old: {
             version = "git";
-            src = pkgs.lib.cleanSource ./.;
+            src = pkgs.nix-gitignore.gitignoreSource [] ./.;
             nativeBuildInputs = with pkgs; [
               meson
               ninja
@@ -50,7 +50,7 @@
               librsvg
               wayland-protocols
               libdrm
-              xorg.xcbutilwm
+              libxcb-wm
               wlroots_0_19
             ] ++ [ scenefx-git ];
           });

@@ -6,6 +6,7 @@ bin/
 test/
 build/
 build-*/
+builddir/
 .cache/
 .lvimrc
 config-debug

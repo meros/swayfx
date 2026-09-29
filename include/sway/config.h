@@ -502,6 +502,7 @@ struct sway_config {
 	int shadow_blur_sigma;
 	float shadow_color[4];
 	float shadow_inactive_color[4];
+	float gap_highlight_color[4];
 	float shadow_offset_x, shadow_offset_y;
 
 	bool titlebar_separator;
@@ -543,6 +544,7 @@ struct sway_config {
 	int titlebar_border_thickness;
 	int titlebar_h_padding;
 	int titlebar_v_padding;
+	int stacked_title_gap;
 	size_t urgent_timeout;
 	enum sway_fowa focus_on_window_activation;
 	enum sway_popup_during_fullscreen popup_during_fullscreen;

@@ -268,6 +268,7 @@ static void config_defaults(struct sway_config *config) {
 	config->titlebar_border_thickness = 1;
 	config->titlebar_h_padding = 5;
 	config->titlebar_v_padding = 4;
+	config->stacked_title_gap = 0;
 
 	// floating view
 	config->floating_maximum_width = 0;
@@ -371,6 +372,7 @@ static void config_defaults(struct sway_config *config) {
 	config->shadow_offset_y = 0.0f;
 	color_to_rgba(config->shadow_color, 0x0000007F);
 	color_to_rgba(config->shadow_inactive_color, 0x0000007F);
+	color_to_rgba(config->gap_highlight_color, 0xFFFFFF26);
 
 	config->titlebar_separator = true;
 	config->scratchpad_minimize = false;

@@ -335,10 +335,12 @@ static void arrange_children(enum sway_container_layout layout, list_t *children
 			title_bar_height = 0;
 		}
 
-		int title_height = title_bar_height * children->length;
+		int gap = config->stacked_title_gap;
+		int n = children->length;
+		int title_height = title_bar_height * n + gap * (n > 1 ? n - 1 : 0);
 
 		int y = 0;
-		for (int i = 0; i < children->length; i++) {
+		for (int i = 0; i < n; i++) {
 			struct sway_container *child = children->items[i];
 			bool activated = child == active;
 
@@ -357,7 +359,7 @@ static void arrange_children(enum sway_container_layout layout, list_t *children
 				disable_container(child);
 			}
 
-			y += title_bar_height;
+			y += title_bar_height + gap;
 		}
 	} else if (layout == L_VERT) {
 		int off = 0;

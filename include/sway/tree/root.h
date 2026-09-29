@@ -71,7 +71,12 @@ struct sway_root {
 	struct sway_container *fullscreen_global;
 
 	// Visual highlight for gap between tiling containers on hover
-	struct wlr_scene_rect *gap_highlight;
+	#define GAP_HIGHLIGHT_SEGS 20
+	struct {
+		struct wlr_scene_tree *tree;
+		// Two banks: [0] = primary axis, [1] = cross axis (intersections)
+		struct wlr_scene_rect *segs[2][GAP_HIGHLIGHT_SEGS];
+	} gap_highlight;
 
 	struct {
 		struct wl_signal new_node;

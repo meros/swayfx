@@ -126,6 +126,7 @@ struct sway_container *container_create(struct sway_view *view) {
 
 	c->title_bar.border = alloc_rect_node(c->title_bar.tree, &failed);
 	c->title_bar.background = alloc_rect_node(c->title_bar.tree, &failed);
+	c->title_bar.tab_indicator = alloc_rect_node(c->title_bar.tree, &failed);
 
 	if (view) {
 		// only containers with views can have borders
@@ -319,6 +320,7 @@ void container_update(struct sway_container *con) {
 
 	scene_rect_set_color(con->title_bar.background, colors->background, alpha);
 	scene_rect_set_color(con->title_bar.border, colors->border, alpha);
+	scene_rect_set_color(con->title_bar.tab_indicator, colors->indicator, alpha);
 
 	if (con->view) {
 		scene_rect_set_color(con->border.top, colors->child_border, alpha);
@@ -435,8 +437,8 @@ void container_arrange_title_bar(struct sway_container *con) {
 			con->corner_radius + con->current.border_thickness - thickness : 0;
 	struct fx_corner_radii corners = corner_radii_top(background_corner_radius);
 
-	enum sway_container_layout layout;
-	const list_t *siblings;
+	enum sway_container_layout layout = L_NONE;
+	const list_t *siblings = NULL;
 	if (con->current.parent) {
 		layout = con->current.parent->current.layout;
 		siblings = con->current.parent->current.children;
@@ -455,9 +457,17 @@ void container_arrange_title_bar(struct sway_container *con) {
 				background_corner_radius = 0;
 				corners = corner_radii_none();
 			}
-		} else if (layout == L_STACKED && siblings->items[0] != con) {
-			background_corner_radius = 0;
-			corners = corner_radii_none();
+		} else if (layout == L_STACKED) {
+			if (siblings->length == 1) {
+				corners = corner_radii_all(background_corner_radius);
+			} else if (siblings->items[0] == con) {
+				// first: top corners only (already the default)
+			} else if (siblings->items[siblings->length - 1] == con) {
+				corners = corner_radii_bottom(background_corner_radius);
+			} else {
+				background_corner_radius = 0;
+				corners = corner_radii_none();
+			}
 		}
 	}
 
@@ -484,6 +494,25 @@ void container_arrange_title_bar(struct sway_container *con) {
 			  .height = con->title_bar.background->height,
 			},
 	});
+
+	// Tab indicator: 3px accent line on left edge for active tab in stacked/tabbed
+	bool show_indicator = false;
+	if (con->current.parent || con->current.workspace) {
+		if (layout == L_STACKED || layout == L_TABBED) {
+			show_indicator = con->current.focused ||
+				container_is_current_parent_focused(con);
+		}
+	}
+	if (show_indicator) {
+		int indicator_width = 3;
+		wlr_scene_node_set_enabled(&con->title_bar.tab_indicator->node, true);
+		wlr_scene_node_set_position(&con->title_bar.tab_indicator->node,
+			thickness, thickness);
+		wlr_scene_rect_set_size(con->title_bar.tab_indicator, indicator_width,
+			height - thickness * (config->titlebar_separator ? 2 : 1));
+	} else {
+		wlr_scene_node_set_enabled(&con->title_bar.tab_indicator->node, false);
+	}
 
 	container_update(con);
 }
