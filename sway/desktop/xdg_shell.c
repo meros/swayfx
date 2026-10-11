@@ -618,6 +618,21 @@ void handle_xdg_shell_toplevel(struct wl_listener *listener, void *data) {
 	xdg_toplevel->base->data = xdg_shell_view;
 }
 
+void view_clip_image_capture(struct sway_view *view, const struct wlr_box *clip) {
+	if (view->type != SWAY_VIEW_XDG_SHELL) {
+		return;
+	}
+	struct sway_xdg_shell_view *xdg_shell_view = xdg_shell_view_from_view(view);
+	if (xdg_shell_view->image_capture_tree == NULL ||
+			wl_list_empty(&xdg_shell_view->image_capture_tree->children)) {
+		return;
+	}
+	// The first child is the toplevel's surface tree, popups come after it
+	struct wlr_scene_node *surface_tree = wl_container_of(
+		xdg_shell_view->image_capture_tree->children.next, surface_tree, link);
+	wlr_scene_subsurface_tree_set_clip(surface_tree, clip);
+}
+
 void xdg_toplevel_tag_manager_v1_handle_set_tag(struct wl_listener *listener, void *data) {
 	const struct wlr_xdg_toplevel_tag_manager_v1_set_tag_event *event = data;
 	struct sway_view *view = view_from_wlr_xdg_surface(event->toplevel->base);

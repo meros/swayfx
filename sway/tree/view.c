@@ -1093,6 +1093,7 @@ void view_center_and_clip_surface(struct sway_view *view) {
 			};
 		}
 		wlr_scene_subsurface_tree_set_clip(&con->view->content_tree->node, &clip);
+		view_clip_image_capture(con->view, &clip);
 	}
 }
 

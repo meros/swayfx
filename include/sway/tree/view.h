@@ -324,6 +324,12 @@ void view_unmap(struct sway_view *view);
 void view_update_size(struct sway_view *view);
 void view_center_and_clip_surface(struct sway_view *view);
 
+/**
+ * Clip what an image capture of the view shows the way its content is clipped
+ * on screen: to its geometry, without the client-side shadow around it.
+ */
+void view_clip_image_capture(struct sway_view *view, const struct wlr_box *clip);
+
 struct sway_view *view_from_wlr_xdg_surface(
 	struct wlr_xdg_surface *xdg_surface);
 #if WLR_HAS_XWAYLAND

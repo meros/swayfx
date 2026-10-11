@@ -677,6 +677,7 @@ static void _arrange_container(struct sway_container *con,
 				.height = content_height,
 			};
 			wlr_scene_subsurface_tree_set_clip(&con->view->content_tree->node, &clip);
+			view_clip_image_capture(con->view, &clip);
 		}
 		con->animation_state.current_content_width = content_width;
 		con->animation_state.current_content_height = content_height;
