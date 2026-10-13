@@ -69,7 +69,18 @@ static bool layer_criteria_parse(struct layer_criteria *criteria) {
 			// Reset all args
 			init_criteria_effects(criteria);
 			return true;
-		} else if (strcmp(argv[0], "blur") == 0) {
+		}
+
+		// Every other effect takes one argument, and the parsers below read
+		// argv[1] without looking at argc.
+		if (argc != 2) {
+			sway_log(SWAY_ERROR,
+					"Invalid layer_effects \"%s\"! Expected an effect and one argument.",
+					cmd);
+			return false;
+		}
+
+		if (strcmp(argv[0], "blur") == 0) {
 			criteria->blur_enabled = parse_boolean(argv[1], true);
 			continue;
 		} if (strcmp(argv[0], "blur_xray") == 0) {
@@ -82,11 +93,6 @@ static bool layer_criteria_parse(struct layer_criteria *criteria) {
 			criteria->shadow_enabled = parse_boolean(argv[1], true);
 			continue;
 		} else if (strcmp(argv[0], "corner_radius") == 0) {
-			if (argc != 2) {
-				sway_log(SWAY_ERROR,
-						"Invalid layer_effects corner_radius! Expected a size argument.");
-				return false;
-			}
 			int value;
 			if (cmd_corner_radius_parse_value(argv[1], &value)) {
 				criteria->corner_radius = value;
