@@ -174,10 +174,16 @@ static void transaction_destroy(struct sway_transaction *transaction) {
 					con->animation_state.from_alpha = get_animated_value(con->animation_state.from_alpha,
 						con->animation_state.to_alpha, &con->animation_state.animation);
 					con->animation_state.to_alpha = 0.0f;
-					con->animation_state.from_width = get_animated_value(con->animation_state.from_width,
-						con->animation_state.to_width, &con->animation_state.animation);
-					con->animation_state.from_height = get_animated_value(con->animation_state.from_height,
-						con->animation_state.to_height, &con->animation_state.animation);
+					if (con->animation_state.to_width == -1) {
+						// arrangement forgotten, see forget_arrangement()
+						con->animation_state.from_width = con->animation_state.current_width;
+						con->animation_state.from_height = con->animation_state.current_height;
+					} else {
+						con->animation_state.from_width = get_animated_value(con->animation_state.from_width,
+							con->animation_state.to_width, &con->animation_state.animation);
+						con->animation_state.from_height = get_animated_value(con->animation_state.from_height,
+							con->animation_state.to_height, &con->animation_state.animation);
+					}
 					con->animation_state.to_x = con->animation_state.from_x +
 						(con->animation_state.from_width * (1.0f - POPIN_FACTOR)) / 2.0f;
 					con->animation_state.to_y = con->animation_state.from_y +
@@ -401,6 +407,23 @@ static void disable_container(struct sway_container *con) {
 
 static void arrange_container(struct sway_container *con,
 		int width, int height, int x, int y, bool title_bar, int gaps);
+
+// Back to the state container_create() gives a new container, minus the
+// pop-in: the next arrange_container() snaps the view into place.
+static void forget_arrangement(struct sway_container *con,
+		struct sway_container *keep) {
+	if (con == keep) {
+		return;
+	}
+	finish_animation(&con->animation_state.animation);
+	con->animation_state.to_width = -1;
+	con->animation_state.to_height = -1;
+	if (!con->view) {
+		for (int i = 0; i < con->current.children->length; i++) {
+			forget_arrangement(con->current.children->items[i], keep);
+		}
+	}
+}
 
 static void arrange_inactive_child(struct sway_container *child,
 		int width, int height, int y_pos) {
@@ -749,6 +772,10 @@ static void arrange_container(struct sway_container *con,
 		return;
 	}
 
+	// state reset by forget_arrangement(), not a new window
+	bool unknown_from = con->animation_state.to_width == -1 &&
+		con->animation_state.from_x != -1;
+
 	con->animation_state.to_x = x;
 	con->animation_state.to_y = y;
 	con->animation_state.to_width = width;
@@ -763,6 +790,16 @@ static void arrange_container(struct sway_container *con,
 		con->animation_state.from_height = height * POPIN_FACTOR;
 		con->animation_state.from_alpha = 0.0f;
 		add_animation(&con->animation_state.animation, anim_update_callback, NULL);
+	} else if (unknown_from) {
+		// the scene geometry is stale, so there is nothing to animate from
+		finish_animation(&con->animation_state.animation);
+		con->animation_state.from_x = x;
+		con->animation_state.from_y = y;
+		con->animation_state.from_width = width;
+		con->animation_state.from_height = height;
+		con->animation_state.from_alpha = 1.0f;
+		_arrange_container(con, width, height, x, y, title_bar, gaps);
+		return;
 	} else {
 		// move animation
 		snap_animation_position(con);
@@ -865,6 +902,16 @@ static void arrange_workspace_tiling(struct sway_workspace *ws,
 }
 
 static void disable_workspace(struct sway_workspace *ws) {
+	// a fullscreen workspace is not arranged, so its containers keep the
+	// geometry from before, which can be that of another workspace. A fullscreen
+	// split is the exception: arrange_fullscreen() arranges it right after.
+	struct sway_container *fs = ws->current.fullscreen;
+	if (fs) {
+		for (int i = 0; i < ws->current.tiling->length; i++) {
+			forget_arrangement(ws->current.tiling->items[i], fs->view ? NULL : fs);
+		}
+	}
+
 	// if any containers were just moved to a disabled workspace it will
 	// have the parent of the old workspace. Move the workspace so that it won't
 	// be shown.
