@@ -102,6 +102,13 @@ static void workspace_focus_fullscreen(struct sway_workspace *workspace) {
 	wl_list_for_each(seat, &server.input->seats, link) {
 		focus_ws = seat_get_focused_workspace(seat);
 		if (focus_ws == workspace) {
+			// Already on the fullscreen container or inside it: refocusing
+			// would drop a focused split to its focus-inactive child.
+			struct sway_node *focus = seat_get_focus(seat);
+			if (focus == &workspace->fullscreen->node ||
+					node_has_ancestor(focus, &workspace->fullscreen->node)) {
+				continue;
+			}
 			struct sway_node *new_focus =
 				seat_get_focus_inactive(seat, &workspace->fullscreen->node);
 			seat_set_raw_focus(seat, new_focus);
