@@ -101,14 +101,10 @@ static void workspace_focus_fullscreen(struct sway_workspace *workspace) {
 	struct sway_workspace *focus_ws;
 	wl_list_for_each(seat, &server.input->seats, link) {
 		focus_ws = seat_get_focused_workspace(seat);
-		if (focus_ws == workspace) {
-			// Already on the fullscreen container or inside it: refocusing
-			// would drop a focused split to its focus-inactive child.
-			struct sway_node *focus = seat_get_focus(seat);
-			if (focus == &workspace->fullscreen->node ||
-					node_has_ancestor(focus, &workspace->fullscreen->node)) {
-				continue;
-			}
+		// A focused split stays focused: seat_get_focus_inactive() would
+		// drop it to one of its children.
+		if (focus_ws == workspace &&
+				seat_get_focus(seat) != &workspace->fullscreen->node) {
 			struct sway_node *new_focus =
 				seat_get_focus_inactive(seat, &workspace->fullscreen->node);
 			seat_set_raw_focus(seat, new_focus);
@@ -230,7 +226,7 @@ static void container_move_to_workspace(struct sway_container *container,
 		// A fullscreen split stays whole: unwrapping destroys it, and then
 		// cmd_move_in_direction() has no workspace left to arrange.
 		if (workspace_is_empty(workspace) && container->pending.children &&
-				!container->pending.fullscreen_mode) {
+				container->pending.fullscreen_mode != FULLSCREEN_WORKSPACE) {
 			workspace_unwrap_children(workspace, container);
 			container_reap_empty(container);
 		} else {
